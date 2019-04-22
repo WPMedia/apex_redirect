@@ -1,3 +1,4 @@
-.PHONY install
 install:
-	docker build -t apex . && docker run --rm -it apex
+	docker build -t apex .
+run:
+	docker run --rm -it apex

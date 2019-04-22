@@ -1,0 +1,19 @@
+
+current_certs() {
+  for domain in $(ls /etc/letsencrypt/live | grep -v README); do
+    certbot install --non-interactive --agree-tos --nginx --cert-name $domain
+  done
+}
+
+new_cert() {
+    if [ ! -d /etc/letsencrypt/live/$1 ]; then
+      certbot --register-unsafely-without-email --agree-tos --nginx -d $1
+    fi
+}
+
+while sleep 5; do
+  for entry in $(sort -u /tmp/http.log); do
+    domain=$(basename $entry .)
+    new_cert $domain
+  done
+done
