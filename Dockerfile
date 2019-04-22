@@ -1,5 +1,4 @@
 from nginx
-cmd [ '/usr/bin/supervisord', '-c', '/etc/supervisor/supervisord.conf' ]
 
 run \
   apt update -y \
@@ -13,3 +12,5 @@ run \
 add files/ /
 
 run nginx -T || exit 1
+
+cmd [ "/usr/bin/supervisord", "--nodaemon", "-c", "/etc/supervisor/supervisord.conf" ]
