@@ -17,6 +17,6 @@ run \
 add files/ /
 run chmod +x /manage_certs
 
-run nginx -T || exit 1
+run openresty -T || exit 1
 
 cmd [ "/usr/bin/supervisord", "--nodaemon", "-c", "/etc/supervisor/supervisord.conf" ]
