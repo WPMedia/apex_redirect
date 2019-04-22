@@ -1,4 +1,4 @@
-from nginx
+from openresty/openresty
 
 run \
   apt update -y \
@@ -6,6 +6,11 @@ run \
   apt install -y python-certbot-nginx busybox supervisor \
     || exit 1; \
   busybox --install \
+    || exit 1; \
+  true
+
+run \
+  rm /etc/nginx/sites-enabled/default \
     || exit 1; \
   true
 
