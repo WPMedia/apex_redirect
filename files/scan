@@ -1,3 +1,4 @@
+#! /usr/bin/env bash
 
 current_certs() {
   for domain in $(ls /etc/letsencrypt/live | grep -v README); do
@@ -7,12 +8,14 @@ current_certs() {
 
 new_cert() {
     if [ ! -d /etc/letsencrypt/live/$1 ]; then
+      echo Processing $domain
       certbot --register-unsafely-without-email --agree-tos --nginx -d $1
     fi
 }
 
+current_certs
 while sleep 5; do
-  for entry in $(sort -u /tmp/http.log); do
+  for entry in $(sort -u /tmp/http.log | grep -v '^-$'); do
     domain=$(basename $entry .)
     new_cert $domain
   done
