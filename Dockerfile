@@ -10,6 +10,7 @@ run \
   true
 
 add files/ /
+run chmod +x /manage_certs
 
 run nginx -T || exit 1
 
