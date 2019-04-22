@@ -3,7 +3,7 @@ from openresty/openresty
 run \
   apt update -y \
     || exit 1; \
-  apt install -y python-certbot-nginx busybox supervisor \
+  apt install -y python-certbot-nginx busybox supervisor curl \
     || exit 1; \
   busybox --install \
     || exit 1; \
