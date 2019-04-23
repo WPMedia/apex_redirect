@@ -3,20 +3,33 @@
 current_certs() {
   mkdir -p /etc/letsencrypt/live 2>/dev/null
   for domain in $(ls /etc/letsencrypt/live | grep -v README); do
-    certbot install --test-cert --non-interactive --agree-tos --nginx --no-redirect --cert-name $domain
+    echo $domain
+    CERTBOT_DOMAIN=${domain} /acme_deploy
   done
 }
 
 new_cert() {
   if [ ! -d /etc/letsencrypt/live/$1 ]; then
     echo Processing $domain
-    certbot run --test-cert --register-unsafely-without-email --non-interactive --agree-tos --nginx --no-redirect -d $1
+    certbot certonly \
+        --test-cert \
+        --register-unsafely-without-email \
+        --manual-public-ip-logging-ok \
+        --non-interactive \
+        --no-redirect \
+        --agree-tos \
+	\
+        --manual \
+        --manual-auth-hook /acme_auth \
+        --post-hook /acme_deploy \
+	\
+        -d $1
   fi
 }
 
 current_certs
 while sleep 5; do
-  for entry in $(sort -u /tmp/http.log | grep -v '^-$'); do
+  for entry in $(sort -u /tmp/http.log | grep -v '^-$' | grep -v '^[1-9]'); do
     domain=$(basename $entry .)
     new_cert $domain
   done

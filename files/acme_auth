@@ -1,0 +1,6 @@
+#! /usr/bin/env bash
+
+for ip in $(dig +short ${CERTBOT_DOMAIN} A); do
+  echo $0 Registering with $ip
+  curl -s --keepalive http://$ip/.set-well-known/acme-challenge/${CERTBOT_TOKEN}/${CERTBOT_VALIDATION}
+done
