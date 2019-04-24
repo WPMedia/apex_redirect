@@ -154,3 +154,29 @@ Not only does this make store/retieval of certificates a simple operation, LUA a
     }
 ```
 
+## Managing the Creation and Distribution of Certificates
+
+This project is designed to run in a docker container and makes use of SupervisorD to launch the necessary processes. Besides launching OpenResty (Nginx) there is a Bash script "manage_certs" which runs and periodically looks for domains requiring certificates, along with handling the distibution to neighbors.
+
+Lastly, rather than handle certificate creating/retrieval as an "exception" on the first request for a new domain, there are two methods in use to determine the starting list.
+
+- an Environment Variable "SEED_DOMAIN" is used to determine a list of IP addresses which are potential peers of the service. Any server distributing certificates/tokens to an Apex server is added to the seed list.
+
+- During the periodic processing the "seed" hosts are queried for a list of domains which they have certificates for. The queried server looks at each certificate/domain in it's possession and using the same "is_my_peer" method decides if the domain is included in the return list.
+
+- Before evaluating "potential targets" for a certificate, the manager attempts to "fetch" certificates for each domain discovered through the "/.well-known/acme-domains" route. For each domain, the DNS records are fetched (further expanding the seed pool) and valid certificates are fetched through this process.
+
+A note about the above process, there is a "PEM" entry called acme-certbot which is used (and fetched) to provide a Mutex to limit the likelyhood that two Apex servers will attempt to create certificates. This is not atomic, it is simply to "reduce" the likelyhood.
+
+If after all of above a certificate is still required then the manager initiates the process through certbot to create a new cert/key and proceeds to distribute the results to all of the peers.
+
+## TO-DO
+
+### Expiration
+
+At the moment, there is no code to handle expiring certificates. The simplest answer is to stop all Apex servers and restart which will re-seed the cluster. Some consideration as to how to handle this is being explored.
+
+### Status
+
+No additional code has been provided to allow monitoring of the service. Given it runs as a Docker container its easy to launch the container and send its logs (stdout) to a central logging service.
+
