@@ -1,8 +1,10 @@
 #! /usr/bin/env bash
 
+mkdir -p /tmp/peers
 export OUR_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
 mute() { $@ >/dev/null 2>&1; }
+report() { echo ${FUNCNAME[1]} $@ >&2; }
 
 distribute_keys() {
     for pem in $(find /etc/letsencrypt/live -name '*.pem'); do
@@ -10,7 +12,7 @@ distribute_keys() {
         keytype=$(basename $pem .pem)
    
         for ip in $(dig +short ${domain} A); do
-            echo $0 Registering ${domain}:${keytype} with $ip
+            report Registering PEM ${domain}:${keytype} with $ip
             curl -s http://$ip/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem
         done
 
@@ -20,33 +22,48 @@ distribute_keys() {
 
 fetch_keys() {
     local domain=$1
-    mute mkdir -p /etc/letsencrypt/live/${domain}
+    if [ -d /etc/letsencrypt/live/${domain} ]; then
+        return
+    fi
 
+    mute mkdir -p /etc/letsencrypt/live/${domain}
     for keytype in fullchain privkey; do
-        for ip in $(dig +short ${domain} A); do
+        for ip in $(dig +short ${domain} A | grep -v ${OUR_PUBLIC_IP}); do
+            touch /tmp/peers/${ip}
             if [ ! -f /etc/letsencrypt/live/${domain}/${keytype}.* ]; then
-                echo Asking ${ip} for ${domain}:${keytype}
+                report Asking ${ip} for ${domain}:${keytype}
                 curl http://${ip}/.well-known/acme-${keytype} \
                     --silent --fail \
                     --header "Host: ${domain}" \
                     --output /etc/letsencrypt/live/${domain}/${keytype}.fetch
 
+                # If curl reported error then delete the file
+                #
                 [ $? -ne 0 ] && mute rm /etc/letsencrypt/live/${domain}/${keytype}.fetch
             fi
         done
-    done
 
-    for pem in $(find /etc/letsencrypt/live/${domain}/ -name '*.fetch'); do
-        curl -s http://$HOSTNAME/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem \
-        && mv $pem $pem.loaded
-    done
+        if [ -f /etc/letsencrypt/live/${domain}/${keytype}.fetch ]; then
+            pem=/etc/letsencrypt/live/${domain}/${keytype}.fetch
+            report Uploading ${domain}/${keytype} locally
 
+            curl --silent --fail http://$OUR_PUBLIC_IP/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem
+            if [ $? -ne 0 ]; then
+                report Local upload failed ${domain}/${keytype}
+                mute rm /etc/letsencrypt/live/${domain}/${keytype}.fetch
+
+            else
+                mv $pem $pem.loaded
+
+            fi
+        fi
+    done
     mute rmdir /etc/letsencrypt/live/${domain}
 }
 
 new_cert() {
     if [ -z "$(dig +short @8.8.8.8 $1 A | grep ${OUR_PUBLIC_IP})" ]; then
-        echo Domain $1 does not map to our public IP address
+        report Domain $1 does not map to our public IP address
 
     else
         # First try to fetch from peers
@@ -56,7 +73,7 @@ new_cert() {
         # If that was not successful, then go create new ones
         #
         if [ ! -d /etc/letsencrypt/live/$1 ]; then
-            echo Processing $domain
+            report Processing $domain
             certbot certonly \
                 --test-cert \
                 --register-unsafely-without-email \
@@ -82,5 +99,10 @@ while sleep 5; do
         new_cert $domain
     done
 
+    for peer in $(ls /tmp/peers); do
+        for domain in $(curl -s http://${peer}/.well-known/acme-domains); do
+            fetch_keys $1
+        done
+    done
     distribute_keys
 done
