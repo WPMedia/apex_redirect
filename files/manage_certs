@@ -21,13 +21,28 @@ distribute_keys() {
 fetch_keys() {
     local domain=$1
     mute mkdir -p /etc/letsencrypt/live/${domain}
-    for keytype in fullchain; do
+
+    for keytype in fullchain privkey; do
         for ip in $(dig +short ${domain} A); do
-            if [ ! -f /etc/letsencrypt/live/${domain}/${keytype}.pem -a ! -f /etc/letsencrypt/live/${domain}/${keytype}.pem.loaded ]; then
-                curl -s http://${ip}/.well-known/acme-${keytype} -H "Host: ${domain}" --output /etc/letsencrypt/live/${domain}/${keytype}.pem
+            if [ ! -f /etc/letsencrypt/live/${domain}/${keytype}.* ]; then
+                echo Asking ${ip} for ${domain}:${keytype}
+                curl http://${ip}/.well-known/acme-${keytype} \
+                    --silent --fail \
+                    --header "Host: ${domain}" \
+                    --output /etc/letsencrypt/live/${domain}/${keytype}.fetch
+
+                [ $? -ne 0 ] && echo delete && mute rm /etc/letsencrypt/live/${domain}/${keytype}.fetch
             fi
         done
     done
+
+    for pem in $(find /etc/letsencrypt/live/${domain}/ -name '*.fetch'); do
+        curl -s http://$ip/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem \
+        && mv $pem $pem.loaded
+    done
+
+    mute rmdir /etc/letsencrypt/live/${domain}
+    echo leaving $0
 }
 
 new_cert() {
