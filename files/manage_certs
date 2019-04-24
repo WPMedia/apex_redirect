@@ -3,6 +3,12 @@
 mkdir -p /tmp/peers
 export OUR_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
+if [ -n "${SEED_DOMAIN}" ]; then
+    for peer in $(dig +short ${SEED_DOMAIN} A | grep -v ${OUR_PUBLIC_IP}); do
+        touch /tmp/peers/${peer}
+    done
+fi
+
 mute() { $@ >/dev/null 2>&1; }
 report() { echo ${FUNCNAME[1]} $@ >&2; }
 
@@ -91,11 +97,12 @@ new_cert() {
 }
 
 
-while sleep 60; do
+while true; do
     for peer in $(ls /tmp/peers); do
         report checking peer ${peer} for domains
+        curl -s http://${peer}/.well-known/acme-domains
         for domain in $(curl -s http://${peer}/.well-known/acme-domains); do
-            fetch_keys $1
+            fetch_keys $domain
         done
     done
 
@@ -104,4 +111,5 @@ while sleep 60; do
         new_cert $domain
         distribute_keys
     done
+    sleep 20
 done
