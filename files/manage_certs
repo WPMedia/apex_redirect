@@ -80,6 +80,10 @@ new_cert() {
         #
         if [ ! -d /etc/letsencrypt/live/$1 ]; then
             report Processing $domain
+
+            curl --silent --fail http://$OUR_PUBLIC_IP/.well-known/acme-fullchain -H "Host: ${domain}"
+            [ $? -eq 0 ] && report We have FullChain for ${domain} && return
+
             curl --silent --fail http://$OUR_PUBLIC_IP/.well-known/acme-certbot -H "Host: ${domain}" --data ${OUR_PUBLIC_IP}
             certbot certonly \
                 --test-cert \
