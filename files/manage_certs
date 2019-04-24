@@ -10,7 +10,7 @@ distribute_keys() {
         keytype=$(basename $pem .pem)
    
         for ip in $(dig +short ${domain} A); do
-            echo $0 Registering $domain with $ip
+            echo $0 Registering ${domain}:${keytype} with $ip
             curl -s http://$ip/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem
         done
 
@@ -31,23 +31,30 @@ fetch_keys() {
                     --header "Host: ${domain}" \
                     --output /etc/letsencrypt/live/${domain}/${keytype}.fetch
 
-                [ $? -ne 0 ] && echo delete && mute rm /etc/letsencrypt/live/${domain}/${keytype}.fetch
+                [ $? -ne 0 ] && mute rm /etc/letsencrypt/live/${domain}/${keytype}.fetch
             fi
         done
     done
 
     for pem in $(find /etc/letsencrypt/live/${domain}/ -name '*.fetch'); do
-        curl -s http://$ip/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem \
+        curl -s http://$HOSTNAME/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem \
         && mv $pem $pem.loaded
     done
 
     mute rmdir /etc/letsencrypt/live/${domain}
-    echo leaving $0
 }
 
 new_cert() {
-    if [ -n "$(dig +short @8.8.8.8 $1 A | grep ${OUR_PUBLIC_IP})" ]; then
+    if [ -z "$(dig +short @8.8.8.8 $1 A | grep ${OUR_PUBLIC_IP})" ]; then
+        echo Domain $1 does not map to our public IP address
+
+    else
+        # First try to fetch from peers
+        #
         fetch_keys $1
+
+        # If that was not successful, then go create new ones
+        #
         if [ ! -d /etc/letsencrypt/live/$1 ]; then
             echo Processing $domain
             certbot certonly \
@@ -63,10 +70,6 @@ new_cert() {
                 \
                 --domain $1
         fi
-
-    else
-        echo Domain $1 does not map to our public IP address
-
     fi
 }
 
