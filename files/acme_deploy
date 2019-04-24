@@ -1,21 +1,23 @@
 #! /usr/bin/env bash
 
-echo $0 Entering ${CERTBOT_DOMAIN}
+set -x
 
-cat <<EOF >/etc/nginx/conf.d/${CERTBOT_DOMAIN}.conf
-server {
-    listen 443 ssl;
-    server_name ${CERTBOT_DOMAIN};
-    ssl_certificate /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${CERTBOT_DOMAIN}/privkey.pem;
+if [ -z "$1" ]; then
+    echo $0 Launching Child
+    $0 ${CERTBOT_DOMAIN} &
+    exit 0
 
-    location ~ (.*) {
-        rewrite ^ \$scheme://www.\$host\$request_uri permanent;
-    }
-}
-EOF
+else
+    DOMAIN=$1
+    while [ ! -f /etc/letsencrypt/live/${CERTBOT_DOMAIN}/fullchain.pem ]; do sleep 5; done
 
-openresty -s reload
+    for ip in $(dig +short ${DOMAIN} A); do
+      echo $0 Registering with $ip
+      curl -v http://$ip/.well-known/acme-fullchain -H "Host: ${DOMAIN}" -D @/etc/letsencrypt/live/${DOMAIN}/fullchain.pem
+      curl -v http://$ip/.well-known/acme-privkey -H "Host: ${DOMAIN}" -D @/etc/letsencrypt/live/${DOMAIN}/privkey.pem
+    done
 
-echo $0 Done ${CERTBOT_DOMAIN}
-exit 0
+    mv /etc/letsencrypt/live/${DOMAIN}/fullchain.pem /etc/letsencrypt/live/${DOMAIN}/fullchain.loaded
+    mv /etc/letsencrypt/live/${DOMAIN}/privkey /etc/letsencrypt/live/${DOMAIN}/privkey.loaded
+
+fi

@@ -1,36 +1,68 @@
 #! /usr/bin/env bash
 
-current_certs() {
-  mkdir -p /etc/letsencrypt/live 2>/dev/null
-  for domain in $(ls /etc/letsencrypt/live | grep -v README); do
-    echo $domain
-    CERTBOT_DOMAIN=${domain} /acme_deploy
-  done
+export OUR_PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+mute() { $@ >/dev/null 2>&1; }
+
+distribute_keys() {
+    for pem in $(find /etc/letsencrypt/live -name '*.pem'); do
+        domain=$(basename $(dirname $pem))
+        keytype=$(basename $pem .pem)
+   
+        for ip in $(dig +short ${domain} A); do
+            echo $0 Registering $domain with $ip
+            curl -s http://$ip/.well-known/acme-$keytype -H "Host: ${domain}" --data-binary @$pem
+        done
+
+        mv $pem $pem.loaded
+    done
+}
+
+fetch_keys() {
+    local domain=$1
+    mute mkdir -p /etc/letsencrypt/live/${domain}
+    for keytype in fullchain; do
+        for ip in $(dig +short ${domain} A); do
+            if [ ! -f /etc/letsencrypt/live/${domain}/${keytype}.pem -a ! -f /etc/letsencrypt/live/${domain}/${keytype}.pem.loaded ]; then
+                curl -s http://${ip}/.well-known/acme-${keytype} -H "Host: ${domain}" --output /etc/letsencrypt/live/${domain}/${keytype}.pem
+            fi
+        done
+    done
 }
 
 new_cert() {
-  if [ ! -d /etc/letsencrypt/live/$1 ]; then
-    echo Processing $domain
-    certbot certonly \
-        --test-cert \
-        --register-unsafely-without-email \
-        --manual-public-ip-logging-ok \
-        --non-interactive \
-        --no-redirect \
-        --agree-tos \
-	\
-        --manual \
-        --manual-auth-hook /acme_auth \
-        --post-hook /acme_deploy \
-	\
-        -d $1
-  fi
+    if [ -n "$(dig +short @8.8.8.8 $1 A | grep ${OUR_PUBLIC_IP})" ]; then
+        fetch_keys $1
+        if [ ! -d /etc/letsencrypt/live/$1 ]; then
+            echo Processing $domain
+            certbot certonly \
+                --test-cert \
+                --register-unsafely-without-email \
+                --manual-public-ip-logging-ok \
+                --non-interactive \
+                --no-redirect \
+                --agree-tos \
+                \
+                --manual \
+                --manual-auth-hook /acme_auth \
+                \
+                --domain $1
+        fi
+
+    else
+        echo Domain $1 does not map to our public IP address
+
+    fi
 }
 
-current_certs
+
 while sleep 5; do
-  for entry in $(sort -u /tmp/http.log | grep -v '^-$' | grep -v '^[1-9]'); do
-    domain=$(basename $entry .)
-    new_cert $domain
-  done
+    distribute_keys
+
+    for entry in $(cat /tmp/http.log /tmp/https.log | sort -u | grep -v '^[-1-9]'); do
+        domain=$(basename $entry .)
+        new_cert $domain
+    done
+
+    distribute_keys
 done
