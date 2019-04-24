@@ -27,7 +27,7 @@ fetch_keys() {
     fi
 
     mute mkdir -p /etc/letsencrypt/live/${domain}
-    for keytype in fullchain privkey; do
+    for keytype in certbot fullchain privkey; do
         for ip in $(dig +short ${domain} A | grep -v ${OUR_PUBLIC_IP}); do
             touch /tmp/peers/${ip}
             if [ ! -f /etc/letsencrypt/live/${domain}/${keytype}.* ]; then
@@ -74,6 +74,7 @@ new_cert() {
         #
         if [ ! -d /etc/letsencrypt/live/$1 ]; then
             report Processing $domain
+            curl --silent --fail http://$OUR_PUBLIC_IP/.well-known/acme-certbot -H "Host: ${domain}" --data ${OUR_PUBLIC_IP}
             certbot certonly \
                 --test-cert \
                 --register-unsafely-without-email \
