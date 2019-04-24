@@ -63,3 +63,94 @@ The "getter" method shown below allows retrieval of the challenge by any caller,
         }
     }
 ```
+
+### Certificate Distribution and LetsEncrypt Servers
+
+While it is possible for two independent servers to request a certificate for the same "Common Name" but ACME servers have rate limits which could easily be exceeded. During development I forgot to use the --test-server flag and learned first hand about the 1 WEEK lockout for violating the rate limiters.
+
+So the next challenge is to distribute the Cert/Key to the other servers handling the target Apex domain. Since we already have a method to identify "peers" security concers are already addressed. Creating a route that allow "storing" and "retrieval" of PEM certficates was the next step in the process. This route allows both a POST operation to store the PEM material, along with a GET to fetch the data from the lua shared table named "acme_certs". Unlike the table for tokens, this table is allocated at 10mb of memory and does not have a TTL defined
+
+```
+    location ~ ^/.well-known/acme-(cert|chain|fullchain|privkey|certbot)$ {
+        set $acme_domain $host;
+        set $acme_type $1;
+
+        access_by_lua_block {
+            ngx.exit(is_my_peer(ngx.var.acme_domain, ngx.var.remote_addr))
+        }
+
+        content_by_lua_block {
+            local acme_certs = ngx.shared.acme_certs
+
+            -- If method is POST, then read the body with a Continue
+            --
+            if (ngx.var.request_method == "POST") then
+                ngx.req.read_body()
+                data = ngx.req.get_body_data()
+                acme_certs:set(ngx.var.acme_domain .. ":" .. ngx.var.acme_type, data)
+                ngx.status=200
+                ngx.exit(ngx.status)
+
+            -- Otherwise we are handling a GET
+            --
+            else
+                cert = acme_certs:get(ngx.var.acme_domain .. ":" .. ngx.var.acme_type)
+                if cert == nil then
+                    ngx.status=404
+                    ngx.exit(ngx.status)
+                else
+                    ngx.status=200
+                    ngx.say(cert)
+                    ngx.exit(ngx.status)
+                end
+            end
+        }
+    }
+```
+
+Not only does this make store/retieval of certificates a simple operation, LUA also support altering certificates on-the-fly so in the SSL server configuration the following exists. This method is invokes AFTER the SNI is transmitted from client to server so fetching the fullchain and privkey from the acme_certs shared memory is performed. Unless both Cert/Key are availible the function returns causing a fall-through to the static cert in the container (CN=localhost) but it causes a log entry to be written allowing supervisor to create a certficate
+
+```
+    ssl_certificate_by_lua_block {
+        local ssl = require "ngx.ssl"
+
+        -- Fetch cert from shared mem
+        --
+        local acme_certs = ngx.shared.acme_certs
+        local fullchain = acme_certs:get(ssl.server_name() .. ":fullchain")
+        local privkey = acme_certs:get(ssl.server_name() .. ":privkey")
+
+        if (fullchain == nil or privkey == nil) then
+            return
+        end
+
+        -- convert pem keys to der
+        --
+        local der_cert_chain, err = ssl.cert_pem_to_der(fullchain)
+        if not der_cert_chain then
+            ngx.log(ngx.ERR, "failed to convert certificate chain ", "from PEM to DER: ", err)
+            return ngx.exit(ngx.ERROR)
+        end
+
+        local der_pkey, err = ssl.priv_key_pem_to_der(privkey)
+        if not der_pkey then
+            ngx.log(ngx.ERR, "failed to convert private key ", "from PEM to DER: ", err)
+            return ngx.exit(ngx.ERROR)
+        end
+
+        -- Put keys in place
+        --
+        local ok, err = ssl.set_der_cert(der_cert_chain)
+        if not ok then
+            ngx.log(ngx.ERR, "failed to set DER cert: ", err)
+            return ngx.exit(ngx.ERROR)
+        end
+
+        local ok, err = ssl.set_der_priv_key(der_pkey)
+        if not ok then
+            ngx.log(ngx.ERR, "failed to set DER private key: ", err)
+            return ngx.exit(ngx.ERROR)
+        end
+    }
+```
+
