@@ -103,9 +103,8 @@ new_cert() {
 
 
 while true; do
+    report checking peers $(ls /tmp/peers) for domains
     for peer in $(ls /tmp/peers); do
-        report checking peer ${peer} for domains
-        curl -s http://${peer}/.well-known/acme-domains
         for domain in $(curl -s http://${peer}/.well-known/acme-domains); do
             fetch_keys $domain
         done
@@ -116,5 +115,5 @@ while true; do
         new_cert $domain
         distribute_keys
     done
-    sleep 20
+    sleep 10
 done
