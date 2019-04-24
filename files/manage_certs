@@ -91,18 +91,17 @@ new_cert() {
 }
 
 
-while sleep 5; do
-    distribute_keys
-
-    for entry in $(cat /tmp/http.log /tmp/https.log | sort -u | grep -v '^[-1-9]'); do
-        domain=$(basename $entry .)
-        new_cert $domain
-    done
-
+while sleep 60; do
     for peer in $(ls /tmp/peers); do
+        report checking peer ${peer} for domains
         for domain in $(curl -s http://${peer}/.well-known/acme-domains); do
             fetch_keys $1
         done
     done
-    distribute_keys
+
+    for entry in $(cat /tmp/http.log /tmp/https.log | sort -u | grep -v '^[-1-9]'); do
+        domain=$(basename $entry .)
+        new_cert $domain
+        distribute_keys
+    done
 done
