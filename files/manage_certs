@@ -97,6 +97,9 @@ new_cert() {
                 --manual-auth-hook /acme_auth \
                 \
                 --domain $1
+
+            distribute_keys
+            curl --silent --fail http://$OUR_PUBLIC_IP/.well-known/acme-certbot -H "Host: ${domain}" -X POST
         fi
     fi
 }
