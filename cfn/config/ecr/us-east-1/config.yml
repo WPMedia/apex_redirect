@@ -1,6 +1,6 @@
 template: cfn/templates/ecr-repo.yml
-stack_name: dns-apex-ecr-repo-us-east-1
+stack_name: apex-redirect-ecr-us-east-1
 region: us-east-1
 context:
-    name: dns-apex
+    name: apex-redirect
     environment: ecr
