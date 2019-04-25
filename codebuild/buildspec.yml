@@ -6,7 +6,7 @@ phases:
       - commit_hash=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - echo "Building commit ${commit_hash}"
       - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
-      - docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${image_name}:latest || true
+      - docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${image_name}:latest >/dev/null || true
 
   build:
     commands:
