@@ -2,7 +2,7 @@ version: 0.2
 phases:
   pre_build:
     commands:
-      - image_name=apex_redirect
+      - image_name=apex-redirect
       - commit_hash=${CODEBUILD_RESOLVED_SOURCE_VERSION}
       - echo "Building commit ${commit_hash}"
       - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
