@@ -1,43 +1,43 @@
 Resources:
-	ECRRepo:
-		Type: "AWS::ECR::Repository"
-		Properties:
-			RepositoryName: {{ name }}
-			RepositoryPolicyText: |
-				{
-					"Statement": [
-						{
-							"Effect": "Allow",
-							"Sid": "DefaultViaCodeBuild",
-							"Action": [
-								"ecr:GetDownloadUrlForLayer",
-								"ecr:BatchGetImage",
-								"ecr:BatchCheckLayerAvailability"
-							],
-							"Principal": {
-								"Service": "codebuild.amazonaws.com"
-							}
-						}
-					]
-				}
+    ECRRepo:
+        Type: "AWS::ECR::Repository"
+        Properties:
+            RepositoryName: {{ name }}
+            RepositoryPolicyText: |
+                {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Sid": "DefaultViaCodeBuild",
+                            "Action": [
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:BatchGetImage",
+                                "ecr:BatchCheckLayerAvailability"
+                            ],
+                            "Principal": {
+                                "Service": "codebuild.amazonaws.com"
+                            }
+                        }
+                    ]
+                }
 
-			LifecyclePolicy:
-				LifecyclePolicyText: |
-					{
-						"rules": [
-							{
-								"description": "Expire untagged images older than 30 days",
-								"rulePriority": 1,
-								"action": {
-									"type": "expire"
-								},
-								"selection": {
-									"countNumber": 30,
-									"countType": "sinceImagePushed",
-									"countUnit": "days",
-									"tagStatus": "untagged"
-								}
-							}
-						]
-					}
+            LifecyclePolicy:
+                LifecyclePolicyText: |
+                    {
+                        "rules": [
+                            {
+                                "description": "Expire untagged images older than 30 days",
+                                "rulePriority": 1,
+                                "action": {
+                                    "type": "expire"
+                                },
+                                "selection": {
+                                    "countNumber": 30,
+                                    "countType": "sinceImagePushed",
+                                    "countUnit": "days",
+                                    "tagStatus": "untagged"
+                                }
+                            }
+                        ]
+                    }
 
