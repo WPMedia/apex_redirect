@@ -18,10 +18,10 @@ phases:
       - export IFS=","
       - |
           for REGION in $REGIONS; do
-            eval $(aws ecr get-login --no-include-email --region $REGION)
+            eval $(aws ecr get-login --no-include-email --region $REGION 2>/dev/null)
             docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
             docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest
-            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
-            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash} >/dev/null
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest >/dev/null
           done
       - aws ssm put-parameter --overwrite --name "/deployments/${image_name}/latest" --value ${commit_hash} --type String
