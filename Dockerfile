@@ -18,11 +18,14 @@ run \
         || exit 1; \
     true
 
-run opm get spacewander/luafilesystem 
+run \
+    opm get spacewander/luafilesystem \
+        || exit 1; \
+    true
 
 add files/ /
 run chmod +x /manage_certs
 
-run openresty -T || exit 1
+run openresty -t || exit 1
 
 cmd [ "/usr/bin/supervisord", "--nodaemon", "-c", "/etc/supervisor/supervisord.conf" ]
