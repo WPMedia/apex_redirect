@@ -6,7 +6,7 @@ phases:
           image_name=apex-redirect
           commit_hash=${CODEBUILD_RESOLVED_SOURCE_VERSION}
           echo "Building commit ${commit_hash}"
-          $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION 2>/dev/null) >/dev/null 2>&1
+          $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION 2>/dev/null)
           docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${image_name}:latest >/dev/null || true
 
   build:
@@ -22,7 +22,7 @@ phases:
       - |
           export IFS=","
           for REGION in $REGIONS; do
-            $(aws ecr get-login --no-include-email --region $REGION 2>/dev/null) >/dev/null 2>&1
+            $(aws ecr get-login --no-include-email --region $REGION 2>/dev/null)
             docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
             docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest
             docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash} >/dev/null
