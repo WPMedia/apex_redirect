@@ -1,0 +1,6 @@
+template: cfn/templates/ecr-repo.yml
+stack_name: dns-apex-ecr-repo-us-east-1
+region: us-east-1
+context:
+	name: dns-apex
+	environment: ecr

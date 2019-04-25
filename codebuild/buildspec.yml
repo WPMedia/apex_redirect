@@ -1,0 +1,27 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      - image_name=apex_redirect
+      - commit_hash=${CODEBUILD_RESOLVED_SOURCE_VERSION}
+      - echo "Building commit ${commit_hash}"
+      - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+      - docker pull $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${image_name}:latest || true
+
+  build:
+    commands:
+      - docker build --cache-from $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${image_name}:latest -t ${image_name}:${commit_hash} .
+
+  post_build:
+    commands:
+      - export REGIONS=${REGIONS_LIST:-`aws ssm get-parameter --name "/bootstrap/account-regions" --query Parameter.Value --output text`}
+      - export IFS=","
+      - |
+          for REGION in $REGIONS; do
+            eval $(aws ecr get-login --no-include-email --region $REGION)
+            docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
+            docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
+            docker push $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:latest
+          done
+      - aws ssm put-parameter --overwrite --name "/deployments/${image_name}/latest" --value ${commit_hash} --type String
