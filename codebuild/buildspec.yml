@@ -16,9 +16,11 @@ phases:
   post_build:
     commands:
       - |
-          export IFS=","
-          export REGIONS=${REGIONS_LIST:-`aws ssm get-parameter --name "/bootstrap/account-regions" --query Parameter.Value --output text`}
+          export REGIONS=${REGIONS_LIST:-$(aws ssm get-parameter --name '/bootstrap/account-regions' --query Parameter.Value --output text)}
           echo Pushing to $REGIONS
+
+      - |
+          export IFS=","
           for REGION in $REGIONS; do
             $(aws ecr get-login --no-include-email --region $REGION 2>/dev/null) >/dev/null 2>&1
             docker tag ${image_name}:${commit_hash} $AWS_ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/${image_name}:${commit_hash}
